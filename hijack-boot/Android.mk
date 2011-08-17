@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LOCAL_PATH:= $(call my-dir)
+LOCAL_PATH := $(call my-dir)
 
 # output for hijack_boot
 HIJACK_BOOT_OUT := $(PRODUCT_OUT)/hijack-boot
@@ -151,11 +151,11 @@ $(HIJACK_BOOT_OTA_PACKAGE_TARGET) : $(BUILT_HIJACK_BOOT_FILES_PACKAGE) $(OTATOOL
 	   --override_device=auto \
 	   $(BUILT_HIJACK_BOOT_FILES_PACKAGE) $@
 
-ALL_PREBUILT += $(HIJACK_BOOT_OTA_PACKAGE_TARGET)
-
 # we specify HIJACK_BOOT_OTA_PACKAGE_TARGET as a prebuilt ETC file so that if we
 # include hijack-boot.zip, then it pulls in all the crap above here
 include $(CLEAR_VARS)
+# override LOCAL_PATH to . so that our OTA target is picked up
+LOCAL_PATH := .
 LOCAL_MODULE := hijack-boot.zip
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
