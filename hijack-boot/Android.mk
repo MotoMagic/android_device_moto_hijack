@@ -144,7 +144,7 @@ $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : \
 HIJACK_BOOT_OTA_PACKAGE_TARGET := $(PRODUCT_OUT)/hijack-boot.zip
 $(HIJACK_BOOT_OTA_PACKAGE_TARGET) : $(BUILT_HIJACK_BOOT_FILES_PACKAGE) $(OTATOOLS)
 	@echo "Package hijack-boot OTA: $@"
-	$(hide) ./device/motorola/common/releasetools/hijack_boot_ota_from_target_files -v \
+	$(hide) ./device/motorola/common/hijack-boot/ota_from_target_files -v \
 	   -p $(HOST_OUT) \
 	   -k $(KEY_CERT_PAIR) \
 	   --backup=$(false) \
