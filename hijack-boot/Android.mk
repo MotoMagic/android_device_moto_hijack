@@ -109,6 +109,7 @@ $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : PRIVATE_OTA_TOOLS := $(built_ota_tools)
 $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : PRIVATE_RECOVERY_API_VERSION := $(RECOVERY_API_VERSION)
 $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : \
 		$(HIJACK_BOOT_PREREQS) \
+		$(INSTALLED_RECOVERYIMAGE_TARGET) \
 		$(INSTALLED_ANDROID_INFO_TXT_TARGET) \
 		$(built_ota_tools) \
 		$(HOST_OUT_EXECUTABLES)/fs_config \
@@ -116,6 +117,10 @@ $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : \
 	@echo "Package hijack-boot files: $@"
 	$(hide) rm -rf $@ $(zip_root)
 	$(hide) mkdir -p $(dir $@) $(zip_root)
+	@# Components of the recovery image (required for build but not used)
+	$(hide) mkdir -p $(zip_root)/RECOVERY
+	$(hide) $(call package_files-copy-root, \
+		$(TARGET_RECOVERY_ROOT_OUT),$(zip_root)/RECOVERY/RAMDISK)
 	@# Components of the boot section
 	$(hide) mkdir -p $(zip_root)/NEWBOOT
 	$(hide) $(call package_files-copy-root, \
@@ -144,12 +149,13 @@ $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : \
 HIJACK_BOOT_OTA_PACKAGE_TARGET := $(PRODUCT_OUT)/hijack-boot.zip
 $(HIJACK_BOOT_OTA_PACKAGE_TARGET) : $(BUILT_HIJACK_BOOT_FILES_PACKAGE) $(OTATOOLS)
 	@echo "Package hijack-boot OTA: $@"
-	$(hide) ./device/motorola/common/hijack-boot/ota_from_target_files -v \
-	   -p $(HOST_OUT) \
-	   -k $(KEY_CERT_PAIR) \
-	   --backup=$(false) \
-	   --override_device=auto \
-	   $(BUILT_HIJACK_BOOT_FILES_PACKAGE) $@
+	$(hide) PYTHONPATH="${PYTHONPATH}:build/tools/releasetools" \
+	   ./device/motorola/common/hijack-boot/ota_from_target_files -v \
+	       -p $(HOST_OUT) \
+	       -k $(KEY_CERT_PAIR) \
+	       --backup=$(false) \
+	       --override_device=auto \
+	       $(BUILT_HIJACK_BOOT_FILES_PACKAGE) $@
 
 # we specify HIJACK_BOOT_OTA_PACKAGE_TARGET as a prebuilt ETC file so that if we
 # include hijack-boot.zip, then it pulls in all the crap above here
