@@ -18,9 +18,17 @@ LOCAL_PATH := $(call my-dir)
 HIJACK_BOOT_OUT := $(PRODUCT_OUT)/hijack-boot
 HIJACK_BOOT_OUT_UNSTRIPPED := $(TARGET_OUT_UNSTRIPPED)/hijack-boot
 
-# prerequisites for building hijack-boot.zip
-# we will need the bootimage made to ensure our root directory is finalized
-HIJACK_BOOT_PREREQS := $(INSTALLED_BOOTIMAGE_TARGET)
+# prerequisites for building hijack-boot.zip are defined in HIJACK_BOOT_PREREQS
+
+# we require the a copy of the root directory, so to get that we wait until
+# INSTALLED_BOOTIMAGE_TARGET (which is not set in this file, so we reference
+# it explicitly) is available.
+HIJACK_BOOT_PREREQS := $(PRODUCT_OUT)/boot.img
+
+# we require the recovery.fstab file, so to get that we wait until
+# INSTALLED_RECOVERYIMAGE_TARGET (which is not set in this file, so we reference
+# it explicitly) is available.
+HIJACK_BOOT_PREREQS += $(PRODUCT_OUT)/recovery.img
 
 # copy the hijack file
 file := $(HIJACK_BOOT_OUT)/sbin/hijack
@@ -109,7 +117,6 @@ $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : PRIVATE_OTA_TOOLS := $(built_ota_tools)
 $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : PRIVATE_RECOVERY_API_VERSION := $(RECOVERY_API_VERSION)
 $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : \
 		$(HIJACK_BOOT_PREREQS) \
-		$(INSTALLED_RECOVERYIMAGE_TARGET) \
 		$(INSTALLED_ANDROID_INFO_TXT_TARGET) \
 		$(built_ota_tools) \
 		$(HOST_OUT_EXECUTABLES)/fs_config \
@@ -117,10 +124,10 @@ $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : \
 	@echo "Package hijack-boot files: $@"
 	$(hide) rm -rf $@ $(zip_root)
 	$(hide) mkdir -p $(dir $@) $(zip_root)
-	@# Components of the recovery image (required for build but not used)
-	$(hide) mkdir -p $(zip_root)/RECOVERY
-	$(hide) $(call package_files-copy-root, \
-		$(TARGET_RECOVERY_ROOT_OUT),$(zip_root)/RECOVERY/RAMDISK)
+	@# Copy the recovery fstab
+	$(hide) mkdir -p $(zip_root)/RECOVERY/RAMDISK/etc
+	$(hide) $(ACP) $(TARGET_RECOVERY_ROOT_OUT)/etc/recovery.fstab \
+		$(zip_root)/RECOVERY/RAMDISK/etc
 	@# Components of the boot section
 	$(hide) mkdir -p $(zip_root)/NEWBOOT
 	$(hide) $(call package_files-copy-root, \
