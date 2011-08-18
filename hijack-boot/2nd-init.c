@@ -10,6 +10,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef SECOND_INIT_INJECTION_FUDGE
+#define SECOND_INIT_INJECTION_FUDGE 2048
+#endif
+
 union u
 {
   long val;
@@ -75,31 +79,38 @@ long get_free_address(pid_t pid)
   FILE *fp;
   char filename[30];
   char line[85];
-  long addr;
+  long addr, heap_addr, code_addr;
+  char exec;
   char str[20];
+
+  addr = heap_addr = code_addr = 0;
+
   sprintf(filename, "/proc/%d/maps", pid);
   fp = fopen(filename, "r");
 
   if(fp == NULL)
     exit(1);
 
-#ifdef INIT_HAS_EXEC_HEAP
   while(fgets(line, 85, fp) != NULL)
   {
-    sscanf(line, "%lx-%*x %*s %*s %s", &addr, str);
+    // save the end of the code address in case heap space isn't executable
+    if(code_addr == 0)
+      sscanf(line, "%lx-%lx %*c%*c%c%*c %*s %s", &heap_addr, &code_addr, &exec, str);
+    else
+      sscanf(line, "%lx-%*x %*c%*c%c%*c %*s %s", &heap_addr, &exec, str);
 
+    // we found our heap space
     if(strcmp(str, "00:00") == 0)
-      break;
-  }
-#else
-  /* if this breaks execve try playing with value of 'fudge' */
-  long fudge = 2048;
+    {
+      // if executable, use it, or else use the code space
+      if(exec == 'x')
+        addr = heap_addr;
+      else
+        addr = code_addr - SECOND_INIT_INJECTION_FUDGE;
 
-  /* now that heap isn't +x we clobber code segment instead, eval- */
-  fgets(line, 85, fp);
-  sscanf(line, "%*x-%lx %*s %*s %*s", &addr);
-  addr -= fudge;
-#endif
+      break;
+    }
+  }
 
   fclose(fp);
   return addr;
