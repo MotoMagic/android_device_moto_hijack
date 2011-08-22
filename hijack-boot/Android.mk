@@ -59,6 +59,7 @@ $(file) : device/motorola/common/hijack-boot/hijack.killall
 	$(hide) cp -a device/motorola/common/hijack-boot/hijack.killall $@
 HIJACK_BOOT_PREREQS += $(file)
 
+
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := getprop.c
 LOCAL_FORCE_STATIC_EXECUTABLE := true
@@ -72,6 +73,7 @@ LOCAL_MODULE_STEM := getprop
 HIJACK_BOOT_PREREQS += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE_STEM)
 include $(BUILD_EXECUTABLE)
 
+
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := 2nd-init.c
 LOCAL_FORCE_STATIC_EXECUTABLE := true
@@ -83,8 +85,14 @@ LOCAL_MODULE_CLASS := HIJACK_BOOT_EXECUTABLES
 LOCAL_MODULE_PATH := $(HIJACK_BOOT_OUT)/sbin
 LOCAL_UNSTRIPPED_PATH := $(HIJACK_BOOT_OUT_UNSTRIPPED)
 LOCAL_MODULE_STEM := 2nd-init
+
+ifeq ($(BOARD_USES_BOOTMENU),true)
+        LOCAL_MODULE_PATH := $(PRODUCT_OUT)/system/bootmenu/binary
+endif
+
 HIJACK_BOOT_PREREQS += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE_STEM)
 include $(BUILD_EXECUTABLE)
+
 
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := stop.c
@@ -98,6 +106,7 @@ LOCAL_UNSTRIPPED_PATH := $(HIJACK_BOOT_OUT_UNSTRIPPED)
 LOCAL_MODULE_STEM := stop
 HIJACK_BOOT_PREREQS += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE_STEM)
 include $(BUILD_EXECUTABLE)
+
 
 # now we make the hijack-boot target files package
 name := $(TARGET_PRODUCT)-hijack_boot_files
