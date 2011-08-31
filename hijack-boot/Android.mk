@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ifeq ($(TARGET_NEEDS_MOTOROLA_HIJACK), true)
+
 LOCAL_PATH := $(call my-dir)
 
 # output for hijack_boot
@@ -184,3 +186,5 @@ LOCAL_MODULE_CLASS := ETC
 LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)
 LOCAL_SRC_FILES := $(HIJACK_BOOT_OTA_PACKAGE_TARGET)
 include $(BUILD_PREBUILT)
+
+endif
