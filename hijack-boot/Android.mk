@@ -63,7 +63,10 @@ HIJACK_BOOT_PREREQS += $(file)
 
 
 include $(CLEAR_VARS)
-LOCAL_SRC_FILES := getprop.c
+LOCAL_SRC_FILES := \
+	../../../../system/core/toolbox/getprop.c \
+	../../../../system/core/toolbox/dynarray.c
+LOCAL_CFLAGS := -Dgetprop_main=main
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE := hijack_boot_getprop
 LOCAL_MODULE_TAGS := optional
@@ -97,7 +100,9 @@ include $(BUILD_EXECUTABLE)
 
 
 include $(CLEAR_VARS)
-LOCAL_SRC_FILES := stop.c
+LOCAL_SRC_FILES := \
+	../../../../system/core/toolbox/stop.c
+LOCAL_CFLAGS := -Dstop_main=main
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE := hijack_boot_stop
 LOCAL_MODULE_TAGS := optional
