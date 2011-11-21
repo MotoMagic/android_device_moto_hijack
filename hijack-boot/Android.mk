@@ -119,10 +119,11 @@ $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : \
 		zip_root := $(intermediates)/$(name)
 
 built_ota_tools := \
-        $(call intermediates-dir-for,EXECUTABLES,applypatch)/applypatch \
-        $(call intermediates-dir-for,EXECUTABLES,applypatch_static)/applypatch_static \
-        $(call intermediates-dir-for,EXECUTABLES,check_prereq)/check_prereq \
-        $(call intermediates-dir-for,EXECUTABLES,updater)/updater
+	$(call intermediates-dir-for,EXECUTABLES,applypatch)/applypatch \
+	$(call intermediates-dir-for,EXECUTABLES,applypatch_static)/applypatch_static \
+	$(call intermediates-dir-for,EXECUTABLES,check_prereq)/check_prereq \
+	$(call intermediates-dir-for,EXECUTABLES,sqlite3)/sqlite3 \
+	$(call intermediates-dir-for,EXECUTABLES,updater)/updater
 
 $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : PRIVATE_OTA_TOOLS := $(built_ota_tools)
 $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : PRIVATE_RECOVERY_API_VERSION := $(RECOVERY_API_VERSION)
@@ -164,15 +165,17 @@ $(BUILT_HIJACK_BOOT_FILES_PACKAGE) : \
 	$(hide) (cd $(zip_root) && zip -q ../$(notdir $@) META/filesystem_config.txt)
 
 # next it's the OTA target
+otatools := \
+	$(HOST_OUT_JAVA_LIBRARIES)/signapk.jar
+
 HIJACK_BOOT_OTA_PACKAGE_TARGET := $(PRODUCT_OUT)/hijack-boot.zip
-$(HIJACK_BOOT_OTA_PACKAGE_TARGET) : $(BUILT_HIJACK_BOOT_FILES_PACKAGE) $(OTATOOLS)
+$(HIJACK_BOOT_OTA_PACKAGE_TARGET) : KEY_CERT_PAIR := build/target/product/security/testkey
+$(HIJACK_BOOT_OTA_PACKAGE_TARGET) : $(BUILT_HIJACK_BOOT_FILES_PACKAGE) $(otatools)
 	@echo "Package hijack-boot OTA: $@"
 	$(hide) PYTHONPATH="${PYTHONPATH}:build/tools/releasetools" \
-	   ./device/motorola/common/hijack-boot/ota_from_target_files -v \
+	   device/motorola/common/hijack-boot/ota_from_target_files -v \
 	       -p $(HOST_OUT) \
 	       -k $(KEY_CERT_PAIR) \
-	       --backup=$(false) \
-	       --override_device=auto \
 	       $(BUILT_HIJACK_BOOT_FILES_PACKAGE) $@
 
 # we specify HIJACK_BOOT_OTA_PACKAGE_TARGET as a prebuilt ETC file so that if we

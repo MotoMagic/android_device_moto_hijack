@@ -24,9 +24,14 @@ Usage:  ota_from_target_files [flags] input_target_files output_ota_package
   -b  (--board_config)  <file>
       Deprecated.
 
-  -k  (--package_key)  <key>
-      Key to use to sign the package (default is
-      "build/target/product/security/testkey").
+  -k (--package_key) <key> Key to use to sign the package (default is
+      the value of default_system_dev_certificate from the input
+      target-files's META/misc_info.txt, or
+      "build/target/product/security/testkey" if that value is not
+      specified).
+
+      For incremental OTAs, the default value is based on the source
+      target-file, not the target build.
 
   -i  (--incremental_from)  <file>
       Generate an incremental OTA using the given target-files zip as
@@ -44,13 +49,8 @@ Usage:  ota_from_target_files [flags] input_target_files output_ota_package
   -e  (--extra_script)  <file>
       Insert the contents of file at the end of the update script.
 
-  --backup <boolean>
-      Enable or disable the execution of backuptool.sh.
-      Disabled by default.
-
-  --override_device <device>
-      Override device-specific asserts. Can be a comma-separated list.
-
+  -a  (--aslr_mode)  <on|off>
+      Specify whether to turn on ASLR for the package (on by default).
 """
 
 import sys
@@ -63,17 +63,21 @@ import copy
 import errno
 import os
 import re
-import sha
 import subprocess
 import tempfile
 import time
 import zipfile
 
+try:
+  from hashlib import sha1 as sha1
+except ImportError:
+  from sha import sha as sha1
+
 import common
 import edify_generator
 
 OPTIONS = common.OPTIONS
-OPTIONS.package_key = "build/target/product/security/testkey"
+OPTIONS.package_key = None
 OPTIONS.incremental_source = None
 OPTIONS.require_verbatim = set()
 OPTIONS.prohibit_verbatim = set(("system/build.prop",))
@@ -81,9 +85,8 @@ OPTIONS.patch_threshold = 0.95
 OPTIONS.wipe_user_data = False
 OPTIONS.omit_prereq = False
 OPTIONS.extra_script = None
+OPTIONS.aslr_mode = True
 OPTIONS.worker_threads = 3
-OPTIONS.backuptool = False
-OPTIONS.override_device = 'auto'
 
 def MostPopularKey(d, default):
   """Given a dict, return the key corresponding to the largest
@@ -97,8 +100,12 @@ def MostPopularKey(d, default):
 def IsSymlink(info):
   """Return true if the zipfile.ZipInfo object passed in represents a
   symlink."""
-  return (info.external_attr >> 16) == 0120777 or (info.external_attr >> 16) == 0120755
+  return (info.external_attr >> 16) & 0770000 == 0120000
 
+def IsRegular(info):
+  """Return true if the zipfile.ZipInfo object passed in represents a
+  symlink."""
+  return (info.external_attr >> 28) == 010
 
 class Item:
   """Items represent the metadata (user, group, mode) of files and
@@ -244,16 +251,18 @@ class Item:
 
 
 def CopyNewBootFiles(input_zip, output_zip=None,
-                    substitute=None):
+                     substitute=None):
   """Copies files underneath newboot/ in the input zip to the output
   zip.  Populates the Item class with their metadata, and returns a
-  list of symlinks.  output_zip may be None, in which case the copy is
-  skipped (but the other side effects still happen).  substitute is an
-  optional dict of {output filename: contents} to be output instead of
-  certain input files.
+  list of symlinks as well as a list of files that will be retouched.
+  output_zip may be None, in which case the copy is skipped (but the
+  other side effects still happen).  substitute is an optional dict
+  of {output filename: contents} to be output instead of certain input
+  files.
   """
 
   symlinks = []
+  retouch_files = []
 
   for info in input_zip.infolist():
     if info.filename.startswith("NEWBOOT/"):
@@ -271,6 +280,9 @@ def CopyNewBootFiles(input_zip, output_zip=None,
             data = substitute[fn]
           else:
             data = input_zip.read(info.filename)
+          if info.filename.startswith("NEWBOOT/lib/") and IsRegular(info):
+            retouch_files.append(("/newboot/" + basefilename,
+                                  common.sha1(data).hexdigest()))
           output_zip.writestr(info2, data)
         if fn.endswith("/"):
           Item.Get(fn[:-1], dir=True)
@@ -278,7 +290,15 @@ def CopyNewBootFiles(input_zip, output_zip=None,
           Item.Get(fn, dir=False)
 
   symlinks.sort()
-  return symlinks
+  return (symlinks, retouch_files)
+
+
+def SignOutput(temp_zip_name, output_zip_name):
+  key_passwords = common.GetKeyPasswords([OPTIONS.package_key])
+  pw = key_passwords[OPTIONS.package_key]
+
+  common.SignFile(temp_zip_name, output_zip_name, OPTIONS.package_key, pw,
+                  whole_file=True)
 
 
 def WriteFullOTAPackage(input_zip, output_zip):
@@ -299,13 +319,19 @@ def WriteFullOTAPackage(input_zip, output_zip):
       info_dict=OPTIONS.info_dict)
 
   script.UnpackPackageDir("newboot", "/newboot")
-  symlinks = CopyNewBootFiles(input_zip, output_zip)
+
+  (symlinks, retouch_files) = CopyNewBootFiles(input_zip, output_zip)
   script.MakeSymlinks(symlinks)
+  if OPTIONS.aslr_mode:
+    script.RetouchBinaries(retouch_files)
+  else:
+    script.UndoRetouchBinaries(retouch_files)
 
   Item.GetMetadata(input_zip)
   Item.Get("newboot").SetPermissions(script)
 
   script.AddToZip(input_zip, output_zip)
+
 
 def main(argv):
 
@@ -322,18 +348,19 @@ def main(argv):
       OPTIONS.omit_prereq = True
     elif o in ("-e", "--extra_script"):
       OPTIONS.extra_script = a
+    elif o in ("-a", "--aslr_mode"):
+      if a in ("on", "On", "true", "True", "yes", "Yes"):
+        OPTIONS.aslr_mode = True
+      else:
+        OPTIONS.aslr_mode = False
     elif o in ("--worker_threads"):
       OPTIONS.worker_threads = int(a)
-    elif o in ("--backup"):
-      OPTIONS.backuptool = bool(a.lower() == 'true')
-    elif o in ("--override_device"):
-      OPTIONS.override_device = a
     else:
       return False
     return True
 
   args = common.ParseOptions(argv, __doc__,
-                             extra_opts="b:k:i:d:wne:",
+                             extra_opts="b:k:i:d:wne:a:",
                              extra_long_opts=["board_config=",
                                               "package_key=",
                                               "incremental_from=",
@@ -341,8 +368,8 @@ def main(argv):
                                               "no_prereq",
                                               "extra_script=",
                                               "worker_threads=",
-                                              "backup=",
-                                              "override_device="],
+                                              "aslr_mode=",
+                                              ],
                              extra_option_handler=option_handler)
 
   if len(args) != 2:
@@ -353,10 +380,9 @@ def main(argv):
     OPTIONS.extra_script = open(OPTIONS.extra_script).read()
 
   print "unzipping target target-files..."
-  OPTIONS.input_tmp = common.UnzipTemp(args[0])
+  OPTIONS.input_tmp, input_zip = common.UnzipTemp(args[0])
 
   OPTIONS.target_tmp = OPTIONS.input_tmp
-  input_zip = zipfile.ZipFile(args[0], "r")
   OPTIONS.info_dict = common.LoadInfoDict(input_zip)
   if OPTIONS.verbose:
     print "--- target info ---"
@@ -368,12 +394,20 @@ def main(argv):
     OPTIONS.device_specific = os.path.normpath(OPTIONS.device_specific)
     print "using device-specific extensions in", OPTIONS.device_specific
 
-  output_zip = zipfile.ZipFile(args[1], "w",
+  temp_zip_file = tempfile.NamedTemporaryFile()
+  output_zip = zipfile.ZipFile(temp_zip_file, "w",
                                compression=zipfile.ZIP_DEFLATED)
 
   WriteFullOTAPackage(input_zip, output_zip)
+  if OPTIONS.package_key is None:
+    OPTIONS.package_key = OPTIONS.info_dict.get(
+        "default_system_dev_certificate",
+        "build/target/product/security/testkey")
 
   output_zip.close()
+
+  SignOutput(temp_zip_file.name, args[1])
+  temp_zip_file.close()
 
   common.Cleanup()
 
@@ -382,6 +416,7 @@ def main(argv):
 
 if __name__ == '__main__':
   try:
+    common.CloseInheritedPipes()
     main(sys.argv[1:])
   except common.ExternalError, e:
     print
