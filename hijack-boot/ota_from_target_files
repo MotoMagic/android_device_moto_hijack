@@ -322,10 +322,10 @@ def WriteFullOTAPackage(input_zip, output_zip):
 
   (symlinks, retouch_files) = CopyNewBootFiles(input_zip, output_zip)
   script.MakeSymlinks(symlinks)
-  if OPTIONS.aslr_mode:
-    script.RetouchBinaries(retouch_files)
-  else:
-    script.UndoRetouchBinaries(retouch_files)
+  #if OPTIONS.aslr_mode:
+  #  script.RetouchBinaries(retouch_files)
+  #else:
+  #  script.UndoRetouchBinaries(retouch_files)
 
   Item.GetMetadata(input_zip)
   Item.Get("newboot").SetPermissions(script)
