@@ -52,8 +52,6 @@
 #ifndef LOG_DUMP_BINARY
 #define LOG_DUMP_BINARY "/system/bin/hijack.log_dump"
 #endif
-// frequency of indefinite log
-#define LOG_INDEF_FREQ "10s"
 // convenience define
 #define LOG_PATH LOG_MOUNT"/"LOG_FILE
 #endif

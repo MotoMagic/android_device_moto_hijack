@@ -257,19 +257,27 @@ hijack_log("    mkdir(%s, %d) executing...", "/newboot", S_IRWXU);
             result = mkdir("/newboot", S_IRWXU);
 hijack_log("      returned: %d", result);
 
-hijack_log("    mkdir(%s, %d) executing...", "/preinstall", S_IRWXU);
-            result = mkdir("/preinstall", S_IRWXU);
+            // grab our new update-binary from the hijack-boot zip
+            char * unzip_args[] = { "/system/bin/hijack", "unzip", BOOT_UPDATE_ZIP, "META-INF/com/google/android/update-binary", "-d", "/newboot", NULL };
+hijack_log("    exec(%s, %s, %s, %s, %s, %s) executing...", "/system/bin/hijack", "unzip", BOOT_UPDATE_ZIP, "META-INF/com/google/android/update-binary", "-d", "/newboot");
+            result = exec_and_wait(unzip_args);
 hijack_log("      returned: %d", result);
 
-            // get access to our preinstall
-hijack_log("    hijack_mount(%s, %s, %s) executing...", "/system/bin/hijack", "/dev/block/preinstall", "/preinstall");
-            result = hijack_mount("/system/bin/hijack", "/dev/block/preinstall", "/preinstall");
+            // make the binary executable
+hijack_log("    chmod(%s, %d) executing...", "/newboot/META-INF/com/google/android/update-binary", S_IRWXU);
+            result = chmod("/newboot/META-INF/com/google/android/update-binary", S_IRWXU);
 hijack_log("      returned: %d", result);
 
             // have updater unpack our boot partition (will create /newboot/sbin/hijack)
-            char * updater_args[] = { UPDATE_BINARY, "2", "0", BOOT_UPDATE_ZIP, NULL };
-hijack_log("    exec(\"%s %s %s %s\") executing...", UPDATE_BINARY, "2", "0", BOOT_UPDATE_ZIP);
+            char * updater_args[] = { "/newboot/META-INF/com/google/android/update-binary", "2", "0", BOOT_UPDATE_ZIP, NULL };
+hijack_log("    exec(\"%s %s %s %s\") executing...", "/newboot/META-INF/com/google/android/update-binary", "2", "0", BOOT_UPDATE_ZIP);
             result = exec_and_wait(updater_args);
+hijack_log("      returned: %d", result);
+
+            // delete the unnecessary /newboot/META-INF directory
+            char * rm_meta_args[] = { "/newboot/sbin/hijack", "rm", "-rf", "/newboot/META-INF", NULL };
+hijack_log("    exec(\"%s %s %s %s\") executing...", "/newboot/sbin/hijack", "rm", "-rf", "/newboot/META-INF");
+            result = exec_and_wait(rm_meta_args);
 hijack_log("      returned: %d", result);
 
             // now copy everything to root
@@ -287,11 +295,6 @@ hijack_log("      returned: %d", result);
             // since we have /sbin/hijack, we no longer need /system
 hijack_log("    hijack_umount(%s, %s) executing...", "/sbin/hijack", "/system");
             result = hijack_umount("/sbin/hijack", "/system");
-hijack_log("      returned: %d", result);
-
-            // now we're done with /preinstall
-hijack_log("    hijack_umount(%s, %s) executing...", "/sbin/hijack", "/preinstall");
-            result = hijack_umount("/sbin/hijack", "/preinstall");
 hijack_log("      returned: %d", result);
 
             // now we will attempt to kill EVERYTHING
