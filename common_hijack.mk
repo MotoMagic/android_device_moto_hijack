@@ -21,11 +21,15 @@
 # include all of the hijackery
 PRODUCT_PACKAGES += \
 	hijack \
-	hijack.log_dump \
 	hijack_boot_getprop \
 	hijack_boot_2nd-init \
 	hijack_boot_stop \
 	hijack-boot.zip
+
+ifeq ($(BOARD_HIJACK_LOG_ENABLE),true)
+PRODUCT_PACKAGES += \
+	hijack.log_dump
+endif
 
 # Get additional product configuration from the non-open-source
 # counterpart to this file, if it exists. This is the most specific
