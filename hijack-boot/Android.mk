@@ -14,7 +14,11 @@
 
 ifeq ($(TARGET_NEEDS_MOTOROLA_HIJACK), true)
 
-LOCAL_PATH := $(call my-dir)
+# store the path of this makefile for use later
+MY_PATH := $(call my-dir)
+
+# set our local path
+LOCAL_PATH := $(MY_PATH)
 
 # output for hijack_boot
 HIJACK_BOOT_OUT := $(PRODUCT_OUT)/hijack-boot
@@ -61,11 +65,11 @@ $(file) : device/motorola/common/hijack-boot/hijack.killall
 	$(hide) cp -a device/motorola/common/hijack-boot/hijack.killall $@
 HIJACK_BOOT_PREREQS += $(file)
 
+# set the local path for toolbox functions
+LOCAL_PATH := $(ANDROID_BUILD_TOP)/system/core/toolbox
 
 include $(CLEAR_VARS)
-LOCAL_SRC_FILES := \
-	../../../../system/core/toolbox/getprop.c \
-	../../../../system/core/toolbox/dynarray.c
+LOCAL_SRC_FILES := getprop.c dynarray.c
 LOCAL_CFLAGS := -Dgetprop_main=main
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE := hijack_boot_getprop
@@ -78,6 +82,22 @@ LOCAL_MODULE_STEM := getprop
 HIJACK_BOOT_PREREQS += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE_STEM)
 include $(BUILD_EXECUTABLE)
 
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := stop.c
+LOCAL_CFLAGS := -Dstop_main=main
+LOCAL_FORCE_STATIC_EXECUTABLE := true
+LOCAL_MODULE := hijack_boot_stop
+LOCAL_MODULE_TAGS := optional
+LOCAL_STATIC_LIBRARIES += libcutils libc
+LOCAL_MODULE_CLASS := HIJACK_BOOT_EXECUTABLES
+LOCAL_MODULE_PATH := $(HIJACK_BOOT_OUT)/sbin
+LOCAL_UNSTRIPPED_PATH := $(HIJACK_BOOT_OUT_UNSTRIPPED)
+LOCAL_MODULE_STEM := stop
+HIJACK_BOOT_PREREQS += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE_STEM)
+include $(BUILD_EXECUTABLE)
+
+# reset our local path
+LOCAL_PATH := $(MY_PATH)
 
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := 2nd-init.c
@@ -97,23 +117,6 @@ endif
 
 HIJACK_BOOT_PREREQS += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE_STEM)
 include $(BUILD_EXECUTABLE)
-
-
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES := \
-	../../../../system/core/toolbox/stop.c
-LOCAL_CFLAGS := -Dstop_main=main
-LOCAL_FORCE_STATIC_EXECUTABLE := true
-LOCAL_MODULE := hijack_boot_stop
-LOCAL_MODULE_TAGS := optional
-LOCAL_STATIC_LIBRARIES += libcutils libc
-LOCAL_MODULE_CLASS := HIJACK_BOOT_EXECUTABLES
-LOCAL_MODULE_PATH := $(HIJACK_BOOT_OUT)/sbin
-LOCAL_UNSTRIPPED_PATH := $(HIJACK_BOOT_OUT_UNSTRIPPED)
-LOCAL_MODULE_STEM := stop
-HIJACK_BOOT_PREREQS += $(LOCAL_MODULE_PATH)/$(LOCAL_MODULE_STEM)
-include $(BUILD_EXECUTABLE)
-
 
 # now we make the hijack-boot target files package
 name := $(TARGET_PRODUCT)-hijack_boot_files
